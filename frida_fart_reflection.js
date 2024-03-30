@@ -1,3 +1,4 @@
+//Original:
 //typed by hanbingle,just for fun!!
 //email:edunwu@gmail.com
 //只是对Android 8 版本进行了测试，其他版本请自行移植
@@ -8,274 +9,273 @@
 使用方式2、app启动后，使用frida -U直接attach上进程，执行fart()函数即可
 高级用法：可以调用dump(classname),传入要处理的类名，只完成对某一个类下的所有函数的CodeItem完成dump，效率更高，dump下来的类函数的所有CodeItem在含有类名的bin文件中。
 * */
-var addrGetDexFile = null;
-var funcGetDexFile = null;
-var addrGetObsoleteDexCache = null;
-var addrGetCodeItemLength = null;
-var funcGetCodeItemLength = null;
-var addrBase64_encode = null;
-var funcBase64_encode = null;
-var addrFreeptr = null;
-var funcFreeptr = null;
-var savepath = "/data/data/com.PEP.biaori/files/DexDump";
+
+//Date: 2024-03-30
+//Modified by HNIdesu
+//Support: Android 11 arm/arm64
+//Comment: 该脚本导出CodeItem效果更好
+//Changes:
+//1.优化了代码。
+//2.将CodeItem改为json格式。
+//3.支持Android11（其他Android版本需要自行修改）。
+
+const saveDirectory = "/sdcard/Android/data/com.lptiyu.tanke/files"
+
+var funcGetDexFile = null
+var addrGetObsoleteDexCache = null
+var funcGetCodeItemLength = null
+var funcBase64_encode = null
+var funcFreePtr = null
 
 function DexFile(start, size) {
-    this.start = start;
-    this.size = size;
+    this.start = start
+    this.size = size
 }
 
 function ArtMethod(dexfile, artmethodptr) {
-    this.dexfile = dexfile;
-    this.artmethodptr = artmethodptr;
+    this.dexfile = dexfile
+    this.artmethodptr = artmethodptr
 }
 
-function dumpcodeitem(classname,methodname, artmethodobj, fileflag) {
-	console.log("dump code item of method: "+classname+"->"+methodname+"\r\n");
-    if (artmethodobj != null) {
-        var dexfileobj = artmethodobj.dexfile;
-        var dexfilebegin = dexfileobj.start;
-        var dexfilesize = dexfileobj.size;
-        var dexfile_path = savepath + "/" + dexfilesize + "_" + Process.getCurrentThreadId() + ".dex";
-        var dexfile_handle = null;
+function dumpCodeItem(className,methodName, artMethod, fileFlag) {
+	console.log("dump code item of method: "+className+"->"+methodName+"\r\n")
+    if (artMethod) {
+        const dexFile = artMethod.dexfile
+        const dexFileAddress = dexFile.start
+        const dexFileSize = dexFile.size
+        const dexFilePath =`${saveDirectory}/${dexFileSize}_${Process.getCurrentThreadId()}.dex`
         try {
-            dexfile_handle = new File(dexfile_path, "r");
-            if (dexfile_handle && dexfile_handle != null) {
-                dexfile_handle.close()
-            }
-
+            const file = new File(dexFilePath, "r")
+            if (file) 
+                file.close()
         } catch (e) {
-            dexfile_handle = new File(dexfile_path, "a+");
-            if (dexfile_handle && dexfile_handle != null) {
-                var dex_buffer = ptr(dexfilebegin).readByteArray(dexfilesize);
-                dexfile_handle.write(dex_buffer);
-                dexfile_handle.flush();
-                dexfile_handle.close();
-                console.log("[dumpdex]:", dexfile_path);
+            const file = new File(dexFilePath, "a+")
+            if (file) {
+                const dex_buffer = ptr(dexFileAddress).readByteArray(dexFileSize)
+                file.write(dex_buffer)
+                file.close()
+                console.log(`dump dex ${dexFilePath}`)
             }
         }
-        var artmethodptr = artmethodobj.artmethodptr;
-        var dex_code_item_offset_ = Memory.readU32(ptr(artmethodptr).add(8));
-        var dex_method_index_ = Memory.readU32(ptr(artmethodptr).add(12));
-        if (dex_code_item_offset_ != null && dex_code_item_offset_ > 0) {
-            var dir = savepath;
-            var file_path = dir + "/" + dexfilesize + "_" + Process.getCurrentThreadId() + "_" + fileflag + ".json";
-            var file_handle = new File(file_path, "a+");
-            if (file_handle && file_handle != null) {
-                var codeitemstartaddr = ptr(dexfilebegin).add(dex_code_item_offset_);
-                var codeitemlength = funcGetCodeItemLength(ptr(codeitemstartaddr));
-                if (codeitemlength != null & codeitemlength > 0) {
-                    Memory.protect(ptr(codeitemstartaddr), codeitemlength, 'rwx');
-                    var base64lengthptr = Memory.alloc(8);
-                    var arr = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
-                    Memory.writeByteArray(base64lengthptr, arr);
-                    var base64ptr = funcBase64_encode(ptr(codeitemstartaddr), codeitemlength, ptr(base64lengthptr));
-                    var b64content = ptr(base64ptr).readCString(base64lengthptr.readInt());
-                    funcFreeptr(ptr(base64ptr));
-					var content=new Object();
-					content.methodname=methodname;
-					content.classname=classname;
-					content.method_idx=dex_method_index_;
-					content.offset=dex_code_item_offset_;
-					content.code_item_len=codeitemlength;
-					content.data=b64content;
-                    
-                    file_handle.write(JSON.stringify(content));
-                    file_handle.flush();
-                    file_handle.close();
+        const pArtMethod = artMethod.artmethodptr
+        const dexCodeItemOffset = Memory.readU32(ptr(pArtMethod).add(8))
+        const dexMethodIndex = Memory.readU32(ptr(pArtMethod).add(12))
+        if (dexCodeItemOffset && dexCodeItemOffset > 0) {
+            const filePath =`${saveDirectory}/${dexFileSize}_${Process.getCurrentThreadId()}_${fileFlag}.json`
+            const file = new File(filePath, "a+")
+            if (file) {
+                const codeItemAddress = ptr(dexFileAddress).add(dexCodeItemOffset)
+                const codeItemLength = funcGetCodeItemLength(ptr(codeItemAddress))
+                if (codeItemLength && codeItemLength > 0) {
+                    Memory.protect(ptr(codeItemAddress), codeItemLength, 'rwx')
+                    const pBase64Pength = Memory.alloc(8)
+                    pBase64Pength.writeU64(0)
+                    const pBase64Content = funcBase64_encode(ptr(codeItemAddress), codeItemLength, ptr(pBase64Pength))
+                    const base64Content = ptr(pBase64Content).readCString(pBase64Pength.readU64())
+                    funcFreePtr(ptr(pBase64Content))
+					const content={
+                        classname:className,
+                        method_idx:dexMethodIndex,
+                        code_item_len:codeItemLength,
+                        data:base64Content
+                    } 
+                    file.write(JSON.stringify(content)+"\r\n")
+                    file.close()
                 }
-
-            } else {
-                console.log("openfile failed,filepath:", file_path);
-            }
+            } else
+                console.log("open file failed,filepath:", filePath)
         }
-
-
     }
 
 }
 
-function init() {
-    console.log("go into init," + "Process.arch:" + Process.arch);
-    var module_libext = null;
-    if (Process.arch === "arm64") {
-        module_libext = Module.load("/data/app/fart64.so");
-    } else if (Process.arch === "arm") {
-        module_libext = Module.load("/data/app/fart.so");
+function initModule() {
+    console.log("go into init," + "Process.arch:" + Process.arch)
+    let fartModule = null
+    if (Process.arch === "arm64")
+        fartModule = Module.load("/data/app/fart64.so")
+    else if (Process.arch === "arm") 
+        fartModule = Module.load("/data/app/fart.so")
+    if (fartModule) {
+        const addrGetDexFile = fartModule.findExportByName("GetDexFile")
+        funcGetDexFile = new NativeFunction(addrGetDexFile, "pointer", ["pointer", "pointer"])
+        const addrGetCodeItemLength = fartModule.findExportByName("GetCodeItemLength")
+        funcGetCodeItemLength = new NativeFunction(addrGetCodeItemLength, "int", ["pointer"])
+        const addrBase64_encode = fartModule.findExportByName("Base64_encode")
+        funcBase64_encode = new NativeFunction(addrBase64_encode, "pointer", ["pointer", "int", "pointer"])
+        const addrFreeptr = fartModule.findExportByName("Freeptr")
+        funcFreePtr = new NativeFunction(addrFreeptr, "void", ["pointer"])
     }
-    if (module_libext != null) {
-        addrGetDexFile = module_libext.findExportByName("GetDexFile");
-        funcGetDexFile = new NativeFunction(addrGetDexFile, "pointer", ["pointer", "pointer"]);
-        addrGetCodeItemLength = module_libext.findExportByName("GetCodeItemLength");
-        funcGetCodeItemLength = new NativeFunction(addrGetCodeItemLength, "int", ["pointer"]);
-        addrBase64_encode = module_libext.findExportByName("Base64_encode");
-        funcBase64_encode = new NativeFunction(addrBase64_encode, "pointer", ["pointer", "int", "pointer"]);
-        addrFreeptr = module_libext.findExportByName("Freeptr");
-        funcFreeptr = new NativeFunction(addrFreeptr, "void", ["pointer"]);
-    }
-    var symbols = Module.enumerateSymbolsSync("libart.so");
-    for (var i = 0; i < symbols.length; i++) {
-        var symbol = symbols[i];
+    for (const symbol of Module.enumerateSymbolsSync("libart.so")) {
         if (symbol.name.indexOf("ArtMethod") >= 0 && symbol.name.indexOf("GetObsoleteDexCache") >= 0) {
-            addrGetObsoleteDexCache = symbol.address;
-            break;
+            addrGetObsoleteDexCache = symbol.address
+            break
         }
     }
 }
 
-function dealwithmethod(classname, method) {
-    var jnienv = Java.vm.getEnv();
-    var ArtMethodptr = jnienv.fromReflectedMethod(ptr(parseInt(method.$l.handle)));
-    var DexFileptr = funcGetDexFile(ptr(ArtMethodptr), ptr(addrGetObsoleteDexCache));
-    if (DexFileptr != null) {
-        var dexfilebegin = Memory.readPointer(ptr(DexFileptr).add(Process.pointerSize * 1));
-        var dexfilesize = Memory.readU32(ptr(DexFileptr).add(Process.pointerSize * 2));
-        var dexfileobj = new DexFile(dexfilebegin, dexfilesize);
-        if (ArtMethodptr != null) {
-            var artmethodobj = new ArtMethod(dexfileobj, ArtMethodptr);
-            dumpcodeitem(classname,method.toString(), artmethodobj, 'all');
-        }
-    }
-}
-var Export;
-function dumpmethod(classname, method) {
-
-    console.log("start dump method:" + classname + "->" + method.toString()+"\r\n");
-    var jnienv = Java.vm.getEnv();
-	var ArtMethodptr = method.getArtMethod();
-	var DexFileptr = funcGetDexFile(ptr(ArtMethodptr), ptr(addrGetObsoleteDexCache));
-
-	console.log("DexPtr:"+DexFileptr+"	"+"ArtPtr:"+ArtMethodptr);
-	if(DexFileptr==undefined){
-		Export=method;
-		return;
+function dealWithMethod(className, method) {
+	try{
+		console.log("start deal with method:" + className + "->" + method.toString())
+		const artMethodPtr = Java.vm.getEnv().fromReflectedMethod(ptr(parseInt(method.$l.handle)))
+		const dexFilePtr = funcGetDexFile(ptr(artMethodPtr), ptr(addrGetObsoleteDexCache))
+		if (dexFilePtr) {
+			const dexFileBegin = Memory.readPointer(ptr(dexFilePtr).add(Process.pointerSize * 1))
+			const dexFileSize = Memory.readU32(ptr(dexFilePtr).add(Process.pointerSize * 2))
+			const dexFile = new DexFile(dexFileBegin, dexFileSize)
+			if (artMethodPtr) {
+				const artMethod = new ArtMethod(dexFile, artMethodPtr)
+				dumpCodeItem(className,method.toString(), artMethod, 'all')
+			}
+		}else
+			console.log("dump method failed!")
+	}catch(e){
+		console.error(e)
 	}
-		
-    if (DexFileptr != null) {
-        var dexfilebegin = Memory.readPointer(ptr(DexFileptr).add(Process.pointerSize * 1));
-        var dexfilesize = Memory.readU32(ptr(DexFileptr).add(Process.pointerSize * 2));
-        var dexfileobj = new DexFile(dexfilebegin, dexfilesize);
-        if (ArtMethodptr != null) {
-            var artmethodobj = new ArtMethod(dexfileobj, ArtMethodptr);
-            dumpcodeitem(classname,method.toString(), artmethodobj, classname);
-        
+	
+}
+
+function dumpMethod(className, method) {
+    console.log("start dump method:" + className + "->" + method.toString())
+	const artMethodPtr = method.getArtMethod()
+	const dexFilePtr = funcGetDexFile(ptr(artMethodPtr), ptr(addrGetObsoleteDexCache))
+	console.log("DexPtr:"+dexFilePtr+"	"+"ArtPtr:"+artMethodPtr)
+    if (dexFilePtr) {
+        const dexFileBegin = Memory.readPointer(ptr(dexFilePtr).add(Process.pointerSize * 1))
+        const dexFileSize = Memory.readU32(ptr(dexFilePtr).add(Process.pointerSize * 2))
+        const dexFile = new DexFile(dexFileBegin, dexFileSize)
+        if (artMethodPtr) {
+            const artMethod = new ArtMethod(dexFile, artMethodPtr)
+            dumpCodeItem(className,method.toString(), artMethod, className)
 		}	
     }else
-		console.log("error!!!!!!!!");
+		console.log("dump method failed!")
 }
 
-function dumpclass(classname) {
+//导出类的全部方法
+function dumpClass(className) {
     if (Java.available) {
         Java.perform(function () {
-            console.log("go into enumerateClassLoaders!\r\n");
+            console.log("go into enumerate classloaders!")
             Java.enumerateClassLoaders({
                 onMatch: function (loader) {
-						var loadclass;
-						
-						try {
-							loadclass = loader.loadClass(classname);
-						} catch (e) {
-							return;
-						}
-						if(loader.toString().indexOf("dalvik.system.PathClassLoader")==0)//加载同一个类，排除掉一个类加载器
-							return;
-                        console.log(loader + "-->loadclass " + classname + " success!\r\n");
-					
-                        var methods = loadclass.getDeclaredConstructors();
-                        for (var i in methods) {
-							if(i.indexOf("$")!=0)//过滤掉非本类中的成员
-								dumpmethod(classname, methods[i]);
-                        }				
-                        methods = loadclass.getDeclaredMethods();			
-                        for (var i in methods) {
-							if(i.indexOf("$")!=0)//过滤掉非本类中的成员
-								dumpmethod(classname, methods[i]);
-                        }
-                    
-
+					dumpClass(className,loader)
                 },
-                onComplete: function () {
-                    //console.log("find  Classloader instance over");
-                }
-            });
-        });
+                onComplete: function () {}
+            })
+        })
     }
 }
 
-function dealwithClassLoader(classloaderobj) {
+//利用已有的classloader导出类的全部方法
+function dumpClass(className,classLoader) {
+    if (Java.available) {
+        Java.perform(function () {
+            let loadclass
+			try {
+				loadclass = classLoader.loadClass(className)
+			} catch (e) {
+				console.log(e)
+				return
+			}
+            console.log(`load class ${className} succeed!`)
+			try{
+				let methods = loadclass.getDeclaredConstructors()
+				for (const methodName in methods) {
+					if(methodName.indexOf("$")!=0)//过滤掉非本类中的成员
+						dumpMethod(className, methods[methodName])
+				}
+				methods = loadclass.getDeclaredMethods()	
+				for (const methodName in methods) {
+					if(methodName.indexOf("$")!=0)//过滤掉非本类中的成员
+						dumpMethod(className, methods[methodName])
+				}
+			}catch(e){
+				console.log(`Enumerate class ${className}'s methods failed.error:${e}`)
+			}
+		})
+    }
+}
+
+function dealWithClassLoader(classLoader) {
     if (Java.available) {
         Java.perform(function () {
             try {
-                var dexfileclass = Java.use("dalvik.system.DexFile");
-                var BaseDexClassLoaderclass = Java.use("dalvik.system.BaseDexClassLoader");
-                var DexPathListclass = Java.use("dalvik.system.DexPathList");
-                var Elementclass = Java.use("dalvik.system.DexPathList$Element");
-                var basedexclassloaderobj = Java.cast(classloaderobj, BaseDexClassLoaderclass);
-                var tmpobj = basedexclassloaderobj.pathList.value;
-                var pathlistobj = Java.cast(tmpobj, DexPathListclass);
-                console.log("pathlistobj->" + pathlistobj);
-                var dexElementsobj = pathlistobj.dexElements.value;
-                console.log("dexElementsobj->" + dexElementsobj);
-                for (var i in dexElementsobj) {
-                    var obj = dexElementsobj[i];
-                    var elementobj = Java.cast(obj, Elementclass);
-                    console.log("elementobj->" + elementobj);
-                    tmpobj = elementobj.dexFile.value;
-                    var dexfileobj = Java.cast(tmpobj, dexfileclass);
-                    var enumeratorClassNames = dexfileobj.entries();
-                    while (enumeratorClassNames.hasMoreElements()) {
-                        var classname = enumeratorClassNames.nextElement().toString();
-                        console.log("start loadclass->" + classname);
-                        var loadclass = classloaderobj.loadClass(classname);
-                        console.log("after loadclass->" + classname);
-                        var methods = loadclass.getDeclaredConstructors();
-                        for (var i in methods) {
-                            dealwithmethod(classname, methods[i]);
-                        }
-                        methods = loadclass.getDeclaredMethods();
-                        for (var i in methods) {
-                            dealwithmethod(classname, methods[i]);
-                        }
-                    }
+				console.log(`start deal with classloader:${classLoader}`)
+                const DexFile = Java.use("dalvik.system.DexFile")
+                const BaseDexClassLoader = Java.use("dalvik.system.BaseDexClassLoader")
+                const DexPathList = Java.use("dalvik.system.DexPathList")
+                const DexPathList_Element = Java.use("dalvik.system.DexPathList$Element")
 
+                const baseDexClassLoader = Java.cast(classLoader, BaseDexClassLoader)
+                const pathList = Java.cast(baseDexClassLoader.pathList.value, DexPathList)
+                const dexElements = pathList.dexElements.value
+                for (const obj of dexElements) {
+                    const element = Java.cast(obj, DexPathList_Element)
+                    const dexFile = Java.cast(element.dexFile.value, DexFile)
+                    const enumeratorClassNames = dexFile.entries()
+                    while (enumeratorClassNames.hasMoreElements()) {
+                        const className = enumeratorClassNames.nextElement().toString()
+                        console.log(`start load class ${className}`)
+						let loadclass = classLoader.loadClass(className)
+                        console.log(`after load class ${className}`)
+						try{
+							let methods = loadclass.getDeclaredConstructors()
+							for (const methodName in methods) {
+								if(methodName.indexOf("$")!=0)//过滤掉非本类中的成员
+									dumpMethod(className, methods[methodName])
+							}
+							methods = loadclass.getDeclaredMethods()	
+							for (const methodName in methods) {
+								if(methodName.indexOf("$")!=0)//过滤掉非本类中的成员
+									dumpMethod(className, methods[methodName])
+							}
+						}catch(e){
+							console.log(`Enumerate class ${className}'s methods failed.error:${e}`)
+						}
+                        
+                    }
                 }
             } catch (e) {
-                console.log(e);
+                console.log(e)
             }
 
-        });
+        })
     }
-
-
 }
 
 function fart() {
     if (Java.available) {
         Java.perform(function () {
-            console.log("go into enumerateClassLoaders!");
+            console.log("start to enumerate classloaders!")
             Java.enumerateClassLoaders({
                 onMatch: function (loader) {
-                    if (loader.toString().indexOf("BootClassLoader") >= 0) {
-                        console.log("this is a BootClassLoader!")
-                    } else {
+                    if (loader.toString().indexOf("BootClassLoader") ==-1) {
                         try {
-                            console.log("startdealwithclassloader:", loader, '\n');
-                            dealwithClassLoader(loader);
+                            dealWithClassLoader(loader)
                         } catch (e) {
-                            console.log("error", e);
+                            console.log(`deal with classloader failed,error:${e}`)
                         }
-                    }
+                    } 
                 },
                 onComplete: function () {
-                    console.log("find  Classloader instance over");
+                    console.log("find classloader instance over")
                 }
-            });
-        });
+            })
+        })
     }
 }
-function test(obj){//用于输出对象属性
-	for(var pro in obj){
-		console.log(pro+":"+obj[pro]);
-	}
-}
 
-setImmediate(init);
+setImmediate(initModule)
+/*
+const Application=Java.use("android.app.Application");
+var AppContext;
+Application["getApplicationContext"].implementation=function(){
+    if(!AppContext){
+        AppContext=this.getApplicationContext()
+        dumpClass("com.lptiyu.tanke.activities.BeforeLoginActivity",AppContext.getClassLoader())
+        return AppContext
+    }else
+        return this.getApplicationContext()
+}*/
+
