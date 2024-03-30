@@ -10,9 +10,10 @@ frida -U -f com.example.test -l frida_fart_hook.js --no-pause，然后等待app�
 高级用法：如果发现某个类中的函数的CodeItem没有dump下来，可以调用dump(classname),传入要处理的类名，完成对该类下的所有函数体的dump,dump下来的函数体会追加到bin文件当中。
 */
 
-//Date: 2024-03-29
+//Date: 2024-03-30
 //Modified by HNIdesu
 //Support: Android 11 arm/arm64
+//Comment: 该脚本导出dex效果更好
 //Changes:
 //1.优化了代码。
 //2.将CodeItem改为json格式。
@@ -117,7 +118,7 @@ function hookArt() {
                         const dex_buffer = ptr(dexFileAddress).readByteArray(dexFileSize)
                         file.write(dex_buffer)
                         file.close()
-                        console.log(`dump dex :${dexFilePath}`)
+                        console.log(`dump dex:${dexFilePath}`)
                     }
                 }
             }
@@ -153,7 +154,7 @@ function dumpCodeItem(artMethod) {
                 const dexBuffer = ptr(dexFileAddress).readByteArray(dexFileSize)
                 file.write(dexBuffer)
                 file.close()
-                console.log(`dump dex: ${dexFileSavePath}`)
+                console.log(`dump dex:${dexFileSavePath}`)
             }
         }
         const artmethodPtr = artMethod.artmethodptr
@@ -193,8 +194,9 @@ function dumpAll() {
     try{
         for (const pArtMethod in artMethodMap)
             dumpCodeItem(artMethodMap[pArtMethod])
-    }catch(_){}
-    
+    }catch(ex){
+		console.error("dump codeitem failed:",ex)
+	}
     console.log("end dump all codeitems.......")
 }
 
