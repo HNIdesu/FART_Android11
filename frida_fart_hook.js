@@ -164,7 +164,7 @@ function dumpCodeItem(artMethod) {
         const dexCodeItemOffset = Memory.readU32(ptr(artmethodPtr).add(8))
         const dexMethodIndex = Memory.readU32(ptr(artmethodPtr).add(12))
         if (dexCodeItemOffset && dexCodeItemOffset > 0) {
-            const filePath=`${saveDirectory}/${dexFileSize}_${Process.getCurrentThreadId()}.bin`
+            const filePath=`${saveDirectory}/${dexFileSize}_${Process.getCurrentThreadId()}.json`
             const file = new File(filePath, "a+")
             if (file) {
                 const codeItemStartAddress = ptr(dexFileAddress).add(dexCodeItemOffset)
