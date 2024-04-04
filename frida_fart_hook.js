@@ -34,7 +34,7 @@ var funcFreeArtMethodPrettyName=null
 
 
 //最好为目标应用数据目录（/sdcard/Android/data/{package_name}/files或者/data/data/{package_name}/files），结尾不加'/'!
-const saveDirectory = "/sdcard/Android/data/com.*.tanke/files"
+const saveDirectory = "/sdcard/Android/data/com.xxxx.tanke/files"
 const dexFileMap = {}
 const artMethodMap = {}
 
