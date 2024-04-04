@@ -268,14 +268,17 @@ function fart() {
 
 setImmediate(initModule)
 /*
-const Application=Java.use("android.app.Application");
-var AppContext;
-Application["getApplicationContext"].implementation=function(){
-    if(!AppContext){
-        AppContext=this.getApplicationContext()
-        dumpClass("com.xxxx.tanke.activities.BeforeLoginActivity",AppContext.getClassLoader())
-        return AppContext
-    }else
-        return this.getApplicationContext()
-}*/
+Java.perform(()=>{
+	const Application=Java.use("android.app.Application");
+	var AppContext;
+	Application["getApplicationContext"].implementation=function(){
+    	if(!AppContext){
+        	AppContext=this.getApplicationContext()
+        	dumpClass("com.xxxx.tanke.activities.BeforeLoginActivity",AppContext.getClassLoader())
+        	return AppContext
+    	}else
+        	return this.getApplicationContext()
+	}
+})*/
+
 
