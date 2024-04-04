@@ -19,7 +19,7 @@
 //2.将CodeItem改为json格式。
 //3.支持Android11（其他Android版本需要自行修改）。
 
-const saveDirectory = "/sdcard/Android/data/com.lptiyu.tanke/files"
+const saveDirectory = "/sdcard/Android/data/com.xxxx.tanke/files"
 
 var funcGetDexFile = null
 var addrGetObsoleteDexCache = null
@@ -273,7 +273,7 @@ var AppContext;
 Application["getApplicationContext"].implementation=function(){
     if(!AppContext){
         AppContext=this.getApplicationContext()
-        dumpClass("com.lptiyu.tanke.activities.BeforeLoginActivity",AppContext.getClassLoader())
+        dumpClass("com.xxxx.tanke.activities.BeforeLoginActivity",AppContext.getClassLoader())
         return AppContext
     }else
         return this.getApplicationContext()
